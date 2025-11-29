@@ -1,0 +1,46 @@
+# prompts.py
+
+def base_prompt(
+    brand_name: str, 
+    audience: str = "", 
+    tone: str = "friendly", 
+    platform: str = "Instagram"
+) -> str:
+    """
+    Generates a prompt for SocialPulse AI.
+    Automatically uses default values if audience/tone/platform are not provided.
+    """
+    return f"""
+You are SocialPulse AI, a high-quality social media content creator.
+Brand/Product: {brand_name}
+Audience: {audience or 'general'}
+Tone: {tone}
+Platform: {platform}
+
+Please produce:
+1) A 7-day content calendar (for {platform}) with short title for each day.
+2) For each day, produce a caption (1-3 sentences) optimized for {platform}.
+3) For each caption, provide 8 hashtags relevant to the topic.
+4) Provide 3 short ideas for short-form videos (reels/shorts) with timestamps and hook.
+5) Provide a 1-line CTA for each day.
+
+Return ONLY valid JSON in this exact structure, with NO text outside JSON:
+
+{{
+  "calendar": [
+    {{ "day": 1, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 2, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 3, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 4, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 5, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 6, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }},
+    {{ "day": 7, "title": "", "caption": "", "hashtags": ["", "", "", "", "", "", "", ""], "cta": "" }}
+  ],
+  "video_ideas": [
+    {{ "title": "", "hook": "", "scene_plan": ["", "", ""], "length_sec": 30 }},
+    {{ "title": "", "hook": "", "scene_plan": ["", "", ""], "length_sec": 30 }},
+    {{ "title": "", "hook": "", "scene_plan": ["", "", ""], "length_sec": 30 }}
+  ],
+  "extra": ""
+}}
+"""
