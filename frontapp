@@ -1,0 +1,83 @@
+# app.py
+import streamlit as st
+from llm_client import generate_text
+from prompts import base_prompt
+import json
+
+st.set_page_config(page_title="SocialPulse AI", layout="centered")
+
+st.title("SocialPulse AI — Social Media Content Generator")
+st.markdown("Fast AI agent to generate captions, hashtags and a 7-day content calendar.")
+
+with st.form("input_form"):
+    brand = st.text_input("Brand / Product name", placeholder="e.g., NutriBite")
+    audience = st.text_input("Target audience (optional)", placeholder="e.g., young professionals, moms")
+    platform = st.selectbox("Platform", ["Instagram", "LinkedIn", "X/Twitter", "Facebook", "YouTube Shorts"])
+    tone = st.selectbox("Tone", ["Friendly", "Professional", "Witty", "Inspirational", "Educational"])
+    temp = st.slider("Creativity (temperature)", 0.0, 1.0, 0.2)
+    submit = st.form_submit_button("Generate Content")
+
+if submit:
+    if not brand:
+        st.error("Please enter a Brand / Product name.")
+    else:
+        prompt = base_prompt(brand_name=brand, audience=audience, tone=tone.lower(), platform=platform)
+
+        with st.expander("View prompt (optional)"):
+            st.code(prompt, language="text")
+
+        st.info("Generating content — this may take a few seconds...")
+
+        try:
+            output = generate_text(prompt, temperature=temp, max_output_tokens=900)
+        except Exception as e:
+            st.error(f"Generation failed: {e}")
+            output = None
+
+        if output:
+            # Try parsing JSON
+            try:
+                parsed = json.loads(output)
+            except Exception:
+                import re
+                m = re.search(r'\{.*\}', output, flags=re.S)
+                if m:
+                    parsed = json.loads(m.group(0))
+                else:
+                    parsed = {"raw": output}
+
+            st.success("Content generated successfully!")
+
+            # Download JSON
+            st.download_button(
+                "📥 Download JSON Output",
+                data=json.dumps(parsed, indent=2),
+                file_name=f"{brand}_social.json"
+            )
+
+            # Calendar display
+            if "calendar" in parsed:
+                st.subheader("📅 7-Day Content Calendar")
+                for day in parsed["calendar"]:
+                    st.markdown(f"### Day {day.get('day')} — {day.get('title')}")
+                    st.write(day.get("caption"))
+                    st.write("Hashtags: " + " ".join(day.get("hashtags", [])))
+                    st.write("CTA: " + day.get("cta", ""))
+                    st.markdown("---")
+
+            # Video ideas
+            if "video_ideas" in parsed:
+                st.subheader("🎬 Video Ideas")
+                for v in parsed["video_ideas"]:
+                    st.markdown(f"**{v.get('title')}**")
+                    st.write("Hook: " + v.get("hook", ""))
+                    st.write("Scenes:")
+                    for scene in v.get("scene_plan", []):
+                        st.write("• " + scene)
+                    st.write(f"Duration: {v.get('length_sec', 0)} sec")
+                    st.markdown("---")
+
+            # Summary
+            if "extra" in parsed:
+                st.subheader("📌 Summary")
+                st.write(parsed["extra"])
