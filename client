@@ -1,0 +1,81 @@
+# llm_client.py
+import os
+import json
+import requests
+import time
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set. Add it to .streamlit/secrets.toml or environment variables."
+    )
+
+# Recommended default Gemini model (without 'models/' prefix)
+DEFAULT_MODEL = "gemini-2.5-flash"
+
+# Use GEN_MODEL from env or secrets, fallback to DEFAULT_MODEL
+GEN_MODEL = os.getenv("GEN_MODEL") or DEFAULT_MODEL
+
+def generate_text(prompt: str, temperature: float = 0.2, max_output_tokens: int = 800) -> str:
+    """
+    Generates text using Google's Generative Language API.
+    Automatically handles MAX_TOKENS issues.
+    """
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEN_MODEL}:generateContent?key={GOOGLE_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": max_output_tokens
+        }
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload)
+    except Exception as e:
+        raise RuntimeError(f"Request failed: {e}")
+
+    if resp.status_code == 404:
+        raise RuntimeError(
+            f"Generative API error 404: Model '{GEN_MODEL}' not found. "
+            "Check your GEN_MODEL value or your Google Cloud permissions."
+        )
+    elif resp.status_code != 200:
+        raise RuntimeError(f"Generative API error {resp.status_code}: {resp.text}")
+
+    data = resp.json()
+
+    # Try to extract text
+    try:
+        parts = data["candidates"][0]["content"].get("parts", [])
+        if parts and "text" in parts[0]:
+            return parts[0]["text"]
+        else:
+            # MAX_TOKENS reached, give informative message
+            prompt_tokens = data["usageMetadata"].get("promptTokenCount", 0)
+            thoughts_tokens = data["usageMetadata"].get("thoughtsTokenCount", 0)
+            return (
+                f"No text generated. Model hit MAX_TOKENS.\n"
+                f"Prompt tokens: {prompt_tokens}, Thoughts tokens: {thoughts_tokens}.\n"
+                "Consider shortening your prompt or splitting it."
+            )
+    except Exception:
+        # fallback to full JSON for debugging
+        return json.dumps(data, indent=2)
+
+
+def generate_text_retry(prompt: str, temperature: float = 0.2, max_output_tokens: int = 800, retries: int = 3) -> str:
+    """
+    Retry wrapper for generate_text in case of MAX_TOKENS or errors.
+    """
+    for attempt in range(retries):
+        text = generate_text(prompt, temperature, max_output_tokens)
+        if "No text generated. Model hit MAX_TOKENS" not in text:
+            return text
+        else:
+            # Reduce prompt or max_output_tokens slightly for retry
+            max_output_tokens = max(200, int(max_output_tokens * 0.8))
+            prompt = prompt[: int(len(prompt) * 0.8)]
+            time.sleep(0.5)  # short pause before retry
+    return text
